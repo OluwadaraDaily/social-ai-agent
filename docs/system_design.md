@@ -49,6 +49,8 @@ I will use a SQLite database because of its simplicity.
 
 ## API Endpoints
 
+Use `zod` to validate request payloads
+
 1. POST `/posts/generate` 
     
     `{`
@@ -67,7 +69,7 @@ I will use a SQLite database because of its simplicity.
     
     *Security*: Ensure to verify the user accessing this endpoint is a Slack user with signature
     
-    *Concurrency*: Use a DB transaction to lock update and prevent double posting (WHERE status is …)
+    *Concurrency*: Use a DB transaction to lock update and prevent double posting or multiple server updating the same record to ensure scalabilty (WHERE status is …)
     
     *Idempotency*: Use `external_id` as idempotency key to prevent multiple posts
     

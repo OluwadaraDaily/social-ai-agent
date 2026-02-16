@@ -13,7 +13,7 @@ build/
 .env.*.local
 
 # SQLite databases
-*.db
+*.db*
 *.sqlite
 *.sqlite3
 

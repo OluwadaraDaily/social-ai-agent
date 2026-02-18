@@ -13,7 +13,13 @@ const port = process.env.PORT || 3000;
 app.use(express.json());
 
 // Middleware to parse URL-encoded bodies (for Slack)
-app.use(express.urlencoded({ extended: true }));
+// Capture raw body for Slack signature verification
+app.use(express.urlencoded({
+  extended: true,
+  verify: (req: any, _res, buf) => {
+    req.rawBody = buf.toString();
+  }
+}));
 
 // Health check endpoint
 app.get('/', (req, res) => {

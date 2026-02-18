@@ -18,8 +18,12 @@ router.post('/actions', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Get raw body for signature verification
-    const rawBody = JSON.stringify(req.body);
+    // Use raw body captured by middleware for signature verification
+    const rawBody = (req as any).rawBody;
+
+    if (!rawBody) {
+      return res.status(401).json({ error: 'Missing raw body for verification' });
+    }
 
     const isValid = verifySlackSignature(slackSignature, timestamp, rawBody);
 

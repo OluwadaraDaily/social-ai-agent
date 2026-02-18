@@ -2,7 +2,14 @@ import { WebClient } from '@slack/web-api';
 import crypto from 'crypto';
 import type { SlackApprovalMetadata } from '../types.js';
 
-const slackClient = new WebClient(process.env.SLACK_BOT_TOKEN);
+let slackClient: WebClient;
+
+function getSlackClient(): WebClient {
+  if (!slackClient) {
+    slackClient = new WebClient(process.env.SLACK_BOT_TOKEN);
+  }
+  return slackClient;
+}
 
 export async function sendApprovalMessage(
   postId: string,
@@ -16,7 +23,7 @@ export async function sendApprovalMessage(
   }
 
   try {
-    const result = await slackClient.chat.postMessage({
+    const result = await getSlackClient().chat.postMessage({
       channel,
       text: `New ${platform} post pending approval`,
       blocks: [

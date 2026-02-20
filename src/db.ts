@@ -59,6 +59,28 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at);
 `);
 
+// Create job_queue table for persistent background jobs (retry + DLQ)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS job_queue (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending'
+      CHECK(status IN ('pending', 'processing', 'completed', 'failed', 'dead')),
+    attempts INTEGER NOT NULL DEFAULT 0,
+    max_retries INTEGER NOT NULL DEFAULT 3,
+    last_error TEXT,
+    next_run_at TEXT NOT NULL DEFAULT (datetime('now')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_job_queue_status_next
+    ON job_queue(status, next_run_at)
+`);
+
 // Helper function to generate UUID (for use in application code)
 export const generateUUID = (): string => {
   return randomUUID();

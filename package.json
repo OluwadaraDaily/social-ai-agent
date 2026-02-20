@@ -21,6 +21,7 @@
     "better-sqlite3": "^12.6.2",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
     "openai": "^6.22.0",
     "twitter-api-v2": "^1.29.0",
     "zod": "^4.3.6"

@@ -1,6 +1,14 @@
 import { WebClient } from '@slack/web-api';
 import crypto from 'crypto';
 import type { SlackApprovalMetadata } from '../types.js';
+import { CircuitBreaker } from '../circuit-breaker/index.js';
+
+const slackCircuit = new CircuitBreaker({
+  serviceName: 'slack',
+  failureThreshold: 5,
+  resetTimeoutMs: 30_000,  // 30 seconds
+  successThreshold: 1,
+});
 
 let slackClient: WebClient;
 
@@ -22,54 +30,56 @@ export async function sendApprovalMessage(
     throw new Error('SLACK_APPROVAL_CHANNEL environment variable is required');
   }
 
-  try {
-    const result = await getSlackClient().chat.postMessage({
-      channel,
-      text: `New ${platform} post pending approval`,
-      blocks: [
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `*New ${platform} post pending approval*\n\n${message}`
-          }
-        },
-        {
-          type: 'actions',
-          elements: [
-            {
-              type: 'button',
-              text: {
-                type: 'plain_text',
-                text: 'Approve ✓'
-              },
-              style: 'primary',
-              value: postId,
-              action_id: `approve_${postId}`
-            },
-            {
-              type: 'button',
-              text: {
-                type: 'plain_text',
-                text: 'Reject ✗'
-              },
-              style: 'danger',
-              value: postId,
-              action_id: `reject_${postId}`
+  return slackCircuit.execute(async () => {
+    try {
+      const result = await getSlackClient().chat.postMessage({
+        channel,
+        text: `New ${platform} post pending approval`,
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `*New ${platform} post pending approval*\n\n${message}`
             }
-          ]
-        }
-      ]
-    });
+          },
+          {
+            type: 'actions',
+            elements: [
+              {
+                type: 'button',
+                text: {
+                  type: 'plain_text',
+                  text: 'Approve ✓'
+                },
+                style: 'primary',
+                value: postId,
+                action_id: `approve_${postId}`
+              },
+              {
+                type: 'button',
+                text: {
+                  type: 'plain_text',
+                  text: 'Reject ✗'
+                },
+                style: 'danger',
+                value: postId,
+                action_id: `reject_${postId}`
+              }
+            ]
+          }
+        ]
+      });
 
-    return {
-      channel: result.channel || '',
-      messageTs: result.ts || '',
-    };
-  } catch (error) {
-    console.error('Slack send error:', error);
-    throw new Error('Failed to send Slack approval message');
-  }
+      return {
+        channel: result.channel || '',
+        messageTs: result.ts || '',
+      };
+    } catch (error) {
+      console.error('Slack send error:', error);
+      throw new Error('Failed to send Slack approval message');
+    }
+  });
 }
 
 export function verifySlackSignature(

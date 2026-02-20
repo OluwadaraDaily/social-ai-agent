@@ -1,16 +1,14 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import db from '../db.js';
 import { verifySlackSignature } from '../integrations/slack.js';
-import { postTweet } from '../integrations/twitter.js';
-import type { Post } from '../types.js';
+import { handleSlackAction } from '../services/slack.service.js';
 
 const router = Router();
 
 // POST /slack/actions
 router.post('/actions', async (req: Request, res: Response) => {
   try {
-    // 1. Verify Slack signature
+    // 1. Verify Slack signature (HTTP-layer concern — operates on raw request data)
     const slackSignature = req.headers['x-slack-signature'] as string;
     const timestamp = req.headers['x-slack-request-timestamp'] as string;
 
@@ -18,142 +16,60 @@ router.post('/actions', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Use raw body captured by middleware for signature verification
     const rawBody = (req as any).rawBody;
-
     if (!rawBody) {
       return res.status(401).json({ error: 'Missing raw body for verification' });
     }
 
     const isValid = verifySlackSignature(slackSignature, timestamp, rawBody);
-
     if (!isValid) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // 2. Parse payload (Slack sends as form-encoded, but Express with json middleware handles it)
+    // 2. Parse Slack payload (translating wire format to typed service inputs)
     const payload = typeof req.body.payload === 'string'
       ? JSON.parse(req.body.payload)
       : req.body.payload || req.body;
 
-    // 3. Extract action, postId, and user info
     const action = payload.actions?.[0];
     if (!action) {
       return res.status(400).json({ error: 'No action provided' });
     }
 
-    const actionId = action.action_id;
-    const postId = action.value;
-    const userId = payload.user?.id;
-    const userName = payload.user?.name || payload.user?.username;
+    const actionId = action.action_id as string;
+    const postId = action.value as string;
+    const userId = payload.user?.id as string;
+    const userName = (payload.user?.name || payload.user?.username) as string | undefined;
 
-    // Determine if approve or reject
     const isApprove = actionId.startsWith('approve_');
     const isReject = actionId.startsWith('reject_');
-
     if (!isApprove && !isReject) {
       return res.status(400).json({ error: 'Invalid action' });
     }
 
-    // 4. Begin database transaction
-    const transaction = db.transaction(() => {
-      // 5. Query post with row lock (SQLite doesn't have SELECT FOR UPDATE, but transaction provides isolation)
-      const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId) as Post | undefined;
+    // 3. Delegate all business logic to the service
+    const result = await handleSlackAction(actionId, postId, userId, userName);
 
-      // 6. Check current status
-      if (!post) {
-        return { success: false, message: 'Post not found' };
-      }
+    // 4. Map service outcomes to HTTP responses
+    switch (result.outcome) {
+      case 'not_found':
+        return res.status(404).json({ error: result.message });
 
-      if (post.status !== 'pending') {
-        const previousAction = post.status === 'approved' || post.status === 'posted' ? 'approved' : 'rejected';
-        return {
-          success: false,
-          message: `The post has already been ${previousAction}`
-        };
-      }
+      case 'already_actioned':
+        return res.status(400).json({ error: result.message });
 
-      const now = new Date().toISOString();
+      case 'rejected':
+        return res.json({ message: 'Post rejected successfully' });
 
-      // 7. Handle approve action
-      if (isApprove) {
-        // Update to approved status
-        db.prepare(`
-          UPDATE posts
-          SET status = ?, approved_at = ?, approved_by = ?, updated_at = ?
-          WHERE id = ?
-        `).run('approved', now, userName || userId, now, postId);
-
-        return { success: true, action: 'approve', post };
-      }
-
-      // 8. Handle reject action
-      if (isReject) {
-        db.prepare(`
-          UPDATE posts
-          SET status = ?, rejected_by = ?, updated_at = ?
-          WHERE id = ?
-        `).run('rejected', userName || userId, now, postId);
-
-        return { success: true, action: 'reject' };
-      }
-
-      return { success: false, message: 'Invalid action' };
-    });
-
-    // Execute transaction
-    const result = transaction();
-
-    if (!result.success) {
-      return res.status(400).json({ error: result.message });
-    }
-
-    // 9. If approved, post to social platform
-    if (result.action === 'approve' && result.post) {
-      try {
-        const tweetResult = await postTweet(result.post.message);
-        const now = new Date().toISOString();
-
-        // Update status to posted with external_id
-        db.prepare(`
-          UPDATE posts
-          SET status = ?, external_id = ?, updated_at = ?
-          WHERE id = ?
-        `).run('posted', tweetResult.id, now, postId);
-
+      case 'approved_and_queued':
         return res.json({
-          message: 'Post approved and published successfully',
-          tweet_id: tweetResult.id
+          message: 'Post approved and queued for publishing',
+          job_id: result.jobId,
         });
-      } catch (error: any) {
-        console.error('Failed to post to Twitter:', error);
-
-        // Update status to failed_post
-        const now = new Date().toISOString();
-        db.prepare(`
-          UPDATE posts
-          SET status = ?, updated_at = ?
-          WHERE id = ?
-        `).run('failed_post', now, postId);
-
-        return res.status(500).json({
-          error: 'Post approved but failed to publish',
-          details: error.message
-        });
-      }
     }
-
-    // 10. Return success response
-    res.json({
-      message: result.action === 'approve'
-        ? 'Post approved successfully'
-        : 'Post rejected successfully'
-    });
   } catch (error: any) {
     console.error('Error handling Slack action:', error);
-    res.status(500).json({
-      error: error.message || 'Failed to process action'
-    });
+    res.status(500).json({ error: error.message || 'Failed to process action' });
   }
 });
 

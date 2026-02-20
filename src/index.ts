@@ -11,6 +11,12 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
+// In development, trust the first proxy hop (e.g. ngrok) so express-rate-limit
+// can read the real client IP from X-Forwarded-For.
+if (process.env.NODE_ENV !== 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Global rate limiter — applied before all routes
 app.use(globalLimiter);
 

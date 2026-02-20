@@ -385,3 +385,7 @@ Rather than posting to Twitter immediately on approval, allow approvers to sched
 ### Prompt Management
 
 Prompts are currently hardcoded in the service layer. I would extract them into a configurable prompt registry — stored in the database or a config file — so that non-engineers can tune prompts per platform or use-case without a code deployment.
+
+### RAG
+
+It will be good to have the LLMs to learn user's taste from past tweets and then use that knowledge as an additional context to create new tweets. This is to ensure that the tweet sound as much as the user.

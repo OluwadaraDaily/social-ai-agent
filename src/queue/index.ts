@@ -1,4 +1,4 @@
-import db, { generateUUID } from '../db.js';
+import db, { generateUUID } from '@/db.js';
 import type { Job, JobType, JobPayload, EnqueueOptions } from './types.js';
 
 // Jobs stuck in 'processing' longer than this are assumed crashed and reset.

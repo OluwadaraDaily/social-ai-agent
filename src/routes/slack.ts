@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { verifySlackSignature } from '../integrations/slack.js';
-import { handleSlackAction } from '../services/slack.service.js';
+import { verifySlackSignature } from '@/integrations/slack.js';
+import { handleSlackAction } from '@/services/slack.service.js';
 
 const router = Router();
 

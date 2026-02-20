@@ -1,10 +1,10 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import postsRouter from './routes/posts.js';
-import slackRouter from './routes/slack.js';
-import { errorHandler } from './middleware/error-handler.js';
-import { globalLimiter, generatePostLimiter, slackWebhookLimiter } from './middleware/rate-limit.js';
-import { startWorker, stopWorker } from './queue/worker.js';
+import postsRouter from '@/routes/posts.js';
+import slackRouter from '@/routes/slack.js';
+import { errorHandler } from '@/middleware/error-handler.js';
+import { globalLimiter, generatePostLimiter, slackWebhookLimiter } from '@/middleware/rate-limit.js';
+import { startWorker, stopWorker } from '@/queue/worker.js';
 
 dotenv.config();
 

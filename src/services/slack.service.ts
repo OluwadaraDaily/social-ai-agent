@@ -1,5 +1,5 @@
 import { approvePost, rejectPost } from './post.service.js';
-import { queue } from '../queue/index.js';
+import { queue } from '@/queue/index.js';
 
 export type SlackActionResult =
   | { outcome: 'not_found';          message: string }

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { generatePost, getPostById } from '../services/post.service.js';
-import { validate, generatePostSchema } from '../middleware/validation.js';
+import { generatePost, getPostById } from '@/services/post.service.js';
+import { validate, generatePostSchema } from '@/middleware/validation.js';
 
 const router = Router();
 

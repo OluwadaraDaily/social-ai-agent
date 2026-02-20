@@ -1,5 +1,5 @@
-import { publishToSocial } from '../../services/post.service.js';
-import type { PostToTwitterPayload } from '../types.js';
+import { publishToSocial } from '@/services/post.service.js';
+import type { PostToTwitterPayload } from '@/queue/types.js';
 
 // publishToSocial handles its own DB updates:
 //   success → posts.status = 'posted', external_id = tweetId

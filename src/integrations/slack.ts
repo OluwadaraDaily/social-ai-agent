@@ -1,7 +1,7 @@
 import { WebClient } from '@slack/web-api';
 import crypto from 'crypto';
-import type { SlackApprovalMetadata } from '../types.js';
-import { CircuitBreaker } from '../circuit-breaker/index.js';
+import type { SlackApprovalMetadata } from '@/types.js';
+import { CircuitBreaker } from '@/circuit-breaker/index.js';
 
 const slackCircuit = new CircuitBreaker({
   serviceName: 'slack',
@@ -106,9 +106,10 @@ export function verifySlackSignature(
     .update(sigBasestring)
     .digest('hex');
 
-  // Compare signatures using timing-safe comparison
-  return crypto.timingSafeEqual(
-    Buffer.from(mySignature),
-    Buffer.from(slackSignature)
-  );
+  // Compare signatures using timing-safe comparison.
+  // timingSafeEqual throws if buffers differ in length, so guard first.
+  const myBuf = Buffer.from(mySignature);
+  const theirBuf = Buffer.from(slackSignature);
+  if (myBuf.length !== theirBuf.length) return false;
+  return crypto.timingSafeEqual(myBuf, theirBuf);
 }

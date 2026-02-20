@@ -4,6 +4,10 @@
     // File Layout
     "rootDir": "./src",
     "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
 
     // Environment Settings
     // See also https://aka.ms/tsconfig/module
@@ -40,5 +44,7 @@
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
-  }
+  },
+  // Exclude test files and vitest config from the production build
+  "exclude": ["tests", "vitest.config.ts", "vitest.globalSetup.ts"]
 }

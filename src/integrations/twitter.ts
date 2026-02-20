@@ -1,5 +1,5 @@
 import { TwitterApi } from 'twitter-api-v2';
-import { CircuitBreaker } from '../circuit-breaker/index.js';
+import { CircuitBreaker } from '@/circuit-breaker/index.js';
 
 const twitterCircuit = new CircuitBreaker({
   serviceName: 'twitter',

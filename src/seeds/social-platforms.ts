@@ -1,4 +1,4 @@
-import db, { generateUUID } from '../db.js';
+import db, { generateUUID } from '@/db.js';
 
 interface SocialPlatformSeed {
   slug: string;

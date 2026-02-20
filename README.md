@@ -14,6 +14,7 @@ A backend service that generates social media content using AI, routes posts thr
   - [Twitter / X API Keys](#twitter--x-api-keys)
   - [Seeding the Database](#seeding-the-database)
   - [Running the App](#running-the-app)
+  - [Running Tests](#running-tests)
 - [API Reference](#api-reference)
 - [What I Would Improve with More Time](#what-i-would-improve-with-more-time)
 
@@ -23,15 +24,15 @@ A backend service that generates social media content using AI, routes posts thr
 
 ### 1. Express 5 + TypeScript (ES Modules)
 
-The app is built on Express 5 with TypeScript in strict mode and ES module format (`"type": "module"`). Express 5 ships with built-in async error propagation, removing the need for `try/catch` wrappers in every route handler. TypeScript strict mode catches type errors at compile time, keeping the codebase maintainable as it grows.
+The app is built on Express 5 and TypeScript because the stack of the company is NodeJS + TS. In addition to that Express gives some amazing features. Express 5 ships with built-in async error propagation, removing the need for `try/catch` wrappers in every route handler. TypeScript strict mode catches type errors at compile time, keeping the codebase maintainable as it grows.
 
 ### 2. SQLite via `better-sqlite3` (No ORM)
 
 SQLite with `better-sqlite3` was chosen for simplicity: no database server to run, and the synchronous API makes transactions straightforward without async complexity. Direct SQL with prepared statements avoids ORM overhead and injection risks. WAL mode is enabled for better concurrent read performance, and foreign key constraints are enforced at the database level.
 
-This is a deliberate trade-off — for production scale you would migrate to Postgres, but for this scope SQLite keeps setup friction near zero.
+This is a deliberate trade-off — for production scale I would migrate to Postgres, but for this scope SQLite keeps setup friction near zero.
 
-### 3. Service Layer + Route Separation
+### 3. Service Layer + Route/Controller Separation
 
 Routes are thin: they validate input and call into the service layer. All business logic (post generation, approval, rejection, publishing) lives in `src/services/`. Integrations (Slack, Twitter) are isolated in `src/integrations/`. This separation makes it straightforward to swap implementations, add tests, or move logic to a queue worker without touching HTTP handling.
 
@@ -48,13 +49,7 @@ No changes needed in the service layer or routes.
 
 Rather than fire-and-forget async calls, all side effects (sending Slack approval messages, posting to Twitter) are handled by a persistent job queue backed by the same SQLite database. A polling worker (`src/queue/worker.ts`) runs in-process and picks up jobs every 5 seconds.
 
-Key properties of the queue:
-- **Durability**: Jobs survive server restarts — on startup the worker resets any jobs left in `processing` state (crash recovery).
-- **Retries with exponential backoff**: Failed jobs are retried up to 3 times at 30s → 60s → 120s intervals.
-- **Dead Letter Queue**: Jobs that exhaust all retries move to `dead` status and can be inspected and manually retried via the `JobQueue` API.
-- **Type-safe payloads**: Each job type (`send_slack_approval`, `post_to_twitter`) has a typed payload validated at enqueue time.
-
-This replaces the previous fire-and-forget pattern, giving both Slack notifications and Twitter publishing proper retry semantics without adding an external broker dependency.
+It is durable, anything that is stuck or fails can be retried with backoff, there is a dead letter queue to keep track of all dead jobs.
 
 ### 6. Slack Signature Verification with Raw Body Capture
 
@@ -90,7 +85,7 @@ Rate limit metadata is returned in standard `RateLimit-*` response headers (draf
 
 ### 10. Seed-Driven Platform Configuration
 
-Social platform configuration (slug, name, character limit) is stored in the database rather than hardcoded. The `social_platforms` table is seeded via `npm run seed`. This lets you add LinkedIn, Threads, Instagram, etc. by adding a seed entry, with no code changes required to support them at the data layer.
+Social platform configuration (slug, name, character limit) is stored in the database rather than hardcoded. The `social_platforms` table is seeded via `npm run seed`. This lets you add LinkedIn, Threads, Instagram, etc. by adding a seed entry, with no code changes required to support them at the data layer. Also, we can always reference them by slug rather than ID, this makes it deterministic across environments.
 
 ---
 
@@ -108,6 +103,9 @@ Social platform configuration (slug, name, character limit) is stored in the dat
 Create a `.env` file in the project root:
 
 ```env
+# Database (optional — defaults to data/social_ai.db relative to the build output)
+DB_PATH=...
+
 # Server
 PORT=3000
 
@@ -233,6 +231,28 @@ The server starts on the port defined in `PORT` (default: `3000`).
 
 ---
 
+### Running Tests
+
+No credentials or external services are required — all third-party calls (OpenAI, Slack, Twitter) are mocked. Tests run against an isolated `data/social_ai_test.db` file that is created before the suite and deleted automatically afterwards.
+
+```bash
+npm test                # Run all tests once
+npm run test:watch      # Re-run on file changes
+npm run test:coverage   # Generate a coverage report
+```
+
+The suite is organised as follows:
+
+| Layer | Files | What's covered |
+|---|---|---|
+| Unit | `tests/unit/` | CircuitBreaker state machine, Zod validation middleware, Slack HMAC signature verification |
+| Integration — services | `tests/integration/post.service.test.ts` | `generatePost`, `approvePost`, `rejectPost`, `publishToSocial` |
+| Integration — services | `tests/integration/slack.service.test.ts` | `handleSlackAction` — all outcome paths |
+| Integration — queue | `tests/integration/queue.test.ts` | Enqueue, dequeue, exponential-backoff retry, dead-letter queue, stuck-job recovery |
+| Integration — routes | `tests/integration/routes/` | HTTP layer via supertest — request validation, signature verification, status codes |
+
+---
+
 ## API Reference
 
 ### `POST /posts/generate`
@@ -340,11 +360,12 @@ The queue is functional but in-process and single-node. With more time:
 
 ### Testing
 
-There are currently no tests. I would add:
+The MVP test suite (65 tests, Vitest) covers the critical path end-to-end with no real network calls. With more time I would extend it with:
 
-- **Unit tests** for the LLM adapter, service layer methods, and Slack signature verification.
-- **Integration tests** for the HTTP routes using a test SQLite database.
-- **Contract tests** for the Slack and Twitter integration points (mock the external APIs).
+- **Worker tests**: The job worker polling loop is not covered — handlers are tested directly. A timer-based integration test would verify the full dispatch cycle.
+- **Contract tests**: Pin the exact request/response shapes sent to the Slack and Twitter APIs so a breaking SDK change is caught immediately.
+- **Rate limiter tests**: Verify the per-IP limits are enforced correctly under concurrent load.
+- **CI pipeline**: Run `npm test` on every pull request with a GitHub Actions workflow.
 
 ### Observability
 

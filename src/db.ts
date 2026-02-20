@@ -8,8 +8,10 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize database
-const dbPath = path.join(__dirname, '../data/social_ai.db');
+// Use isolated test DB when running tests, otherwise use production/dev DB.
+const dbPath = process.env.NODE_ENV === 'test'
+  ? path.join(__dirname, '../data/social_ai_test.db')
+  : process.env.DB_PATH ?? path.join(__dirname, '../data/social_ai.db');
 const db: BetterSqlite3.Database = new Database(dbPath);
 
 // Enable foreign keys

@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import type { LLMAdapter } from './adapter.js';
-import type { LLMResponse } from '../types.js';
-import { CircuitBreaker } from '../circuit-breaker/index.js';
+import type { LLMResponse } from '@/types.js';
+import { CircuitBreaker } from '@/circuit-breaker/index.js';
 
 // Module-level singleton — shared across all OpenAIAdapter instances
 const openaiCircuit = new CircuitBreaker({

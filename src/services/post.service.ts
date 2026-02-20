@@ -1,8 +1,8 @@
-import db, { generateUUID } from '../db.js';
-import { getLLMAdapter } from '../llm/index.js';
-import { postTweet } from '../integrations/twitter.js';
-import { queue } from '../queue/index.js';
-import type { Post, SocialPlatform } from '../types.js';
+import db, { generateUUID } from '@/db.js';
+import { getLLMAdapter } from '@/llm/index.js';
+import { postTweet } from '@/integrations/twitter.js';
+import { queue } from '@/queue/index.js';
+import type { Post, SocialPlatform } from '@/types.js';
 
 // Internal service result types — not domain types, live here not in types.ts
 
